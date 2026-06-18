@@ -621,41 +621,61 @@ function loadComics() {
 
 // News
 async function loadNews() {
-    try {
-        // Use RSS feed as the JSON endpoint is no longer available
-        const response = await fetch('https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET');
-        const xmlText = await response.text();
-
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-        const items = xmlDoc.querySelectorAll('item');
-
-        const newsContent = document.getElementById('newsContent');
-        newsContent.innerHTML = '';
-
-        if (items.length > 0) {
-            // Take first 5 items
-            const itemsToShow = Math.min(items.length, 5);
-            for (let i = 0; i < itemsToShow; i++) {
-                const item = items[i];
-                const title = item.querySelector('title')?.textContent || 'Ei otsikkoa';
-                const description = item.querySelector('description')?.textContent || '';
-                const link = item.querySelector('link')?.textContent || '#';
-
-                const newsItem = document.createElement('div');
-                newsItem.className = 'news-item';
-                newsItem.innerHTML = `
-                    <div class="news-title">${title}</div>
-                    <div class="news-summary">${description || title}</div>
-                    <a href="${link}" class="news-link" target="_blank">Lue lisää →</a>
-                `;
-                newsContent.appendChild(newsItem);
+    const newsContent = document.getElementById('newsContent');
+    
+    // Try multiple RSS feed sources - Yle's official feeds
+    const feedUrls = [
+        'https://yle.fi/rss/uutiset/tuoreimmat',
+        'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET'
+    ];
+    
+    let items = [];
+    let lastError = null;
+    
+    for (const feedUrl of feedUrls) {
+        try {
+            const response = await fetch(feedUrl);
+            const xmlText = await response.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+            const foundItems = xmlDoc.querySelectorAll('item');
+            if (foundItems.length > 0) {
+                items = Array.from(foundItems);
+                break;
             }
-        } else {
-            newsContent.innerHTML = '<div class="error">Uutisia ei saatavilla</div>';
+        } catch (error) {
+            lastError = error;
+            console.warn(`Failed to load feed from ${feedUrl}:`, error.message);
+            // Continue to next URL
         }
-    } catch (error) {
-        console.error('News error:', error);
-        document.getElementById('newsContent').innerHTML = '<div class="error">Virhe uutisissa</div>';
+    }
+    
+    newsContent.innerHTML = '';
+    
+    if (items.length > 0) {
+        // Take first 5 items
+        const itemsToShow = Math.min(items.length, 5);
+        for (let i = 0; i < itemsToShow; i++) {
+            const item = items[i];
+            const title = item.querySelector('title')?.textContent || 'Ei otsikkoa';
+            const description = item.querySelector('description')?.textContent || '';
+            const link = item.querySelector('link')?.textContent || '#';
+
+            const newsItem = document.createElement('div');
+            newsItem.className = 'news-item';
+            newsItem.innerHTML = `
+                <div class="news-title">${title}</div>
+                <div class="news-summary">${description || title}</div>
+                <a href="${link}" class="news-link" target="_blank">Lue lisää →</a>
+            `;
+            newsContent.appendChild(newsItem);
+        }
+    } else {
+        // Show helpful error message
+        const errorMsg = lastError?.message?.includes('CORS') || lastError?.message?.includes('origin')
+            ? 'Virhe uutisissa (CORS rajoitus - avaa sivu verkkoselaimen kautta tai tyhjennä välimuisti)'
+            : 'Uutisia ei saatavilla';
+        newsContent.innerHTML = `<div class="error">${errorMsg}</div>`;
+        console.error('News error:', lastError);
     }
 }
