@@ -619,11 +619,18 @@ function loadComics() {
     });
 }
 
+// Helper function to decode base64 data URI
+function decodeBase64DataURI(dataURI) {
+    const base64Data = dataURI.split(',')[1];
+    return atob(base64Data);
+}
+
 // News
 async function loadNews() {
     const newsContent = document.getElementById('newsContent');
     
-    // Try multiple RSS feed sources - Yle's official feeds
+    // Use CORS proxy for Yle RSS feed to work from GitHub Pages
+    // api.allorigins.win returns { contents: "data:...base64..." }
     const feedUrls = [
         'https://yle.fi/rss/uutiset/tuoreimmat',
         'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET'
@@ -634,14 +641,21 @@ async function loadNews() {
     
     for (const feedUrl of feedUrls) {
         try {
-            const response = await fetch(feedUrl);
-            const xmlText = await response.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-            const foundItems = xmlDoc.querySelectorAll('item');
-            if (foundItems.length > 0) {
-                items = Array.from(foundItems);
-                break;
+            // Use CORS proxy
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`;
+            const response = await fetch(proxyUrl);
+            const data = await response.json();
+            
+            // Extract and decode the RSS content
+            if (data.contents && data.contents.startsWith('data:')) {
+                const xmlText = decodeBase64DataURI(data.contents);
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+                const foundItems = xmlDoc.querySelectorAll('item');
+                if (foundItems.length > 0) {
+                    items = Array.from(foundItems);
+                    break;
+                }
             }
         } catch (error) {
             lastError = error;
@@ -672,8 +686,8 @@ async function loadNews() {
         }
     } else {
         // Show helpful error message
-        const errorMsg = lastError?.message?.includes('CORS') || lastError?.message?.includes('origin')
-            ? 'Virhe uutisissa (CORS rajoitus - avaa sivu verkkoselaimen kautta tai tyhjennä välimuisti)'
+        const errorMsg = lastError?.message?.includes('Failed') || lastError?.message?.includes('fetch')
+            ? 'Virhe uutisissa (yritä myöhemmin uudelleen)'
             : 'Uutisia ei saatavilla';
         newsContent.innerHTML = `<div class="error">${errorMsg}</div>`;
         console.error('News error:', lastError);
