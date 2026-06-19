@@ -633,74 +633,57 @@ async function loadNews() {
     let items = [];
     let lastError = null;
     
+    // Try each feed URL with different proxy strategies
     for (const feedUrl of feedUrls) {
+        // Strategy 1: Use r.jina.ai proxy
         try {
-            // Use r.jina.ai proxy which returns markdown
             const proxyUrl = `https://r.jina.ai/${feedUrl}`;
-            const response = await fetch(proxyUrl);
-            
-            if (!response.ok) {
-                console.warn(`Proxy returned ${response.status} for ${feedUrl}`);
-                continue;
-            }
-            
-            const text = await response.text();
-            
-            // Parse the markdown format returned by r.jina.ai
-            // Format:
-            // Title: ...
-            // URL Source: ...
-            // Markdown Content:
-            // # ...
-            // ### [title](url)
-            // description
-            // url
-            // date
-            
-            const lines = text.split('\n');
-            const parsedItems = [];
-            let inContent = false;
-            let currentItem = null;
-            
-            for (const line of lines) {
-                if (line.startsWith('### [')) {
-                    // New item - extract title and URL
-                    if (currentItem) parsedItems.push(currentItem);
-                    const match = line.match(/### \[(.+?)\]\((.+?)\)/);
-                    if (match) {
-                        currentItem = {
-                            title: match[1],
-                            link: match[2],
-                            description: ''
-                        };
-                    }
-                } else if (currentItem && line && !line.startsWith('[') && !line.startsWith('Title:') && 
-                          !line.startsWith('URL Source:') && !line.startsWith('Markdown Content:') &&
-                          !line.startsWith('#') && !line.startsWith('---') && line.trim() !== '') {
-                    // This is part of the description
-                    // Stop if we hit a URL line or date line
-                    if (line.match(/^https?:/) || line.match(/^[A-Z][a-z]{2}, \d/)) {
-                        // Skip URL lines and date lines
-                        continue;
-                    }
-                    if (currentItem.description) {
-                        currentItem.description += ' ' + line.trim();
-                    } else {
-                        currentItem.description = line.trim();
-                    }
+            console.log(`Trying proxy: ${proxyUrl}`);
+            const response = await fetch(proxyUrl, { 
+                headers: {
+                    'Accept': 'text/plain; charset=utf-8'
                 }
-            }
+            });
             
-            if (currentItem) parsedItems.push(currentItem);
-            
-            if (parsedItems.length > 0) {
-                items = parsedItems;
-                break;
+            if (response.ok) {
+                const text = await response.text();
+                const parsedItems = parseMarkdownNews(text);
+                if (parsedItems.length > 0) {
+                    items = parsedItems;
+                    console.log(`Successfully loaded ${items.length} news items from r.jina.ai`);
+                    break;
+                }
+            } else {
+                console.warn(`r.jina.ai returned ${response.status}`);
             }
         } catch (error) {
-            lastError = error;
-            console.warn(`Failed to load feed from ${feedUrl}:`, error.message);
+            console.warn(`r.jina.ai failed:`, error.message);
         }
+        
+        // Strategy 2: Try direct fetch (might work from some origins)
+        try {
+            console.log(`Trying direct fetch: ${feedUrl}`);
+            const response = await fetch(feedUrl);
+            if (response.ok) {
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+                const foundItems = xmlDoc.querySelectorAll('item');
+                if (foundItems.length > 0) {
+                    items = Array.from(foundItems).map(item => ({
+                        title: item.querySelector('title')?.textContent || 'Ei otsikkoa',
+                        description: item.querySelector('description')?.textContent || '',
+                        link: item.querySelector('link')?.textContent || '#'
+                    }));
+                    console.log(`Successfully loaded ${items.length} news items directly`);
+                    break;
+                }
+            }
+        } catch (error) {
+            console.warn(`Direct fetch failed:`, error.message);
+        }
+        
+        if (items.length > 0) break;
     }
     
     newsContent.innerHTML = '';
@@ -733,8 +716,46 @@ async function loadNews() {
             newsContent.appendChild(newsItem);
         }
     } else {
-        const errorMsg = 'Virhe uutisissa - yritä myöhemmin uudelleen.';
+        const errorMsg = 'Virhe uutisissa - palvelin estää pyyntöjä. Kokeile myöhemmin uudelleen.';
         newsContent.innerHTML = `<div class="error">${errorMsg}</div>`;
         console.error('News error:', lastError);
     }
+}
+
+// Helper function to parse markdown news format from r.jina.ai
+function parseMarkdownNews(text) {
+    const lines = text.split('\n');
+    const parsedItems = [];
+    let currentItem = null;
+    
+    for (const line of lines) {
+        if (line.startsWith('### [')) {
+            // New item - extract title and URL
+            if (currentItem) parsedItems.push(currentItem);
+            const match = line.match(/### \[(.+?)\]\((.+?)\)/);
+            if (match) {
+                currentItem = {
+                    title: match[1],
+                    link: match[2],
+                    description: ''
+                };
+            }
+        } else if (currentItem && line && !line.startsWith('[') && !line.startsWith('Title:') && 
+                  !line.startsWith('URL Source:') && !line.startsWith('Markdown Content:') &&
+                  !line.startsWith('#') && !line.startsWith('---') && line.trim() !== '') {
+            // This is part of the description
+            if (line.match(/^https?:/) || line.match(/^[A-Z][a-z]{2}, \d/)) {
+                // Skip URL lines and date lines
+                continue;
+            }
+            if (currentItem.description) {
+                currentItem.description += ' ' + line.trim();
+            } else {
+                currentItem.description = line.trim();
+            }
+        }
+    }
+    
+    if (currentItem) parsedItems.push(currentItem);
+    return parsedItems;
 }
