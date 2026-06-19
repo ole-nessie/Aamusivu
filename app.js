@@ -619,18 +619,12 @@ function loadComics() {
     });
 }
 
-// Helper function to decode base64 data URI
-function decodeBase64DataURI(dataURI) {
-    const base64Data = dataURI.split(',')[1];
-    return atob(base64Data);
-}
-
-// News
+// News - Uses r.jina.ai CORS proxy to fetch Yle RSS feed
+// r.jina.ai converts RSS to markdown format which is easy to parse
 async function loadNews() {
     const newsContent = document.getElementById('newsContent');
+    newsContent.innerHTML = '<div class="loading">Ladataan uutisia...</div>';
     
-    // Use CORS proxy for Yle RSS feed to work from GitHub Pages
-    // api.allorigins.win returns { contents: "data:...base64..." }
     const feedUrls = [
         'https://yle.fi/rss/uutiset/tuoreimmat',
         'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET'
@@ -641,26 +635,71 @@ async function loadNews() {
     
     for (const feedUrl of feedUrls) {
         try {
-            // Use CORS proxy
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`;
+            // Use r.jina.ai proxy which returns markdown
+            const proxyUrl = `https://r.jina.ai/${feedUrl}`;
             const response = await fetch(proxyUrl);
-            const data = await response.json();
             
-            // Extract and decode the RSS content
-            if (data.contents && data.contents.startsWith('data:')) {
-                const xmlText = decodeBase64DataURI(data.contents);
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-                const foundItems = xmlDoc.querySelectorAll('item');
-                if (foundItems.length > 0) {
-                    items = Array.from(foundItems);
-                    break;
+            if (!response.ok) {
+                console.warn(`Proxy returned ${response.status} for ${feedUrl}`);
+                continue;
+            }
+            
+            const text = await response.text();
+            
+            // Parse the markdown format returned by r.jina.ai
+            // Format:
+            // Title: ...
+            // URL Source: ...
+            // Markdown Content:
+            // # ...
+            // ### [title](url)
+            // description
+            // url
+            // date
+            
+            const lines = text.split('\n');
+            const parsedItems = [];
+            let inContent = false;
+            let currentItem = null;
+            
+            for (const line of lines) {
+                if (line.startsWith('### [')) {
+                    // New item - extract title and URL
+                    if (currentItem) parsedItems.push(currentItem);
+                    const match = line.match(/### \[(.+?)\]\((.+?)\)/);
+                    if (match) {
+                        currentItem = {
+                            title: match[1],
+                            link: match[2],
+                            description: ''
+                        };
+                    }
+                } else if (currentItem && line && !line.startsWith('[') && !line.startsWith('Title:') && 
+                          !line.startsWith('URL Source:') && !line.startsWith('Markdown Content:') &&
+                          !line.startsWith('#') && !line.startsWith('---') && line.trim() !== '') {
+                    // This is part of the description
+                    // Stop if we hit a URL line or date line
+                    if (line.match(/^https?:/) || line.match(/^[A-Z][a-z]{2}, \d/)) {
+                        // Skip URL lines and date lines
+                        continue;
+                    }
+                    if (currentItem.description) {
+                        currentItem.description += ' ' + line.trim();
+                    } else {
+                        currentItem.description = line.trim();
+                    }
                 }
+            }
+            
+            if (currentItem) parsedItems.push(currentItem);
+            
+            if (parsedItems.length > 0) {
+                items = parsedItems;
+                break;
             }
         } catch (error) {
             lastError = error;
             console.warn(`Failed to load feed from ${feedUrl}:`, error.message);
-            // Continue to next URL
         }
     }
     
@@ -671,24 +710,17 @@ async function loadNews() {
         const itemsToShow = Math.min(items.length, 5);
         for (let i = 0; i < itemsToShow; i++) {
             const item = items[i];
-            const title = item.querySelector('title')?.textContent || 'Ei otsikkoa';
-            const description = item.querySelector('description')?.textContent || '';
-            const link = item.querySelector('link')?.textContent || '#';
-
             const newsItem = document.createElement('div');
             newsItem.className = 'news-item';
             newsItem.innerHTML = `
-                <div class="news-title">${title}</div>
-                <div class="news-summary">${description || title}</div>
-                <a href="${link}" class="news-link" target="_blank">Lue lisää →</a>
+                <div class="news-title">${item.title || 'Ei otsikkoa'}</div>
+                <div class="news-summary">${item.description || item.title || ''}</div>
+                <a href="${item.link || '#'}" class="news-link" target="_blank">Lue lisää →</a>
             `;
             newsContent.appendChild(newsItem);
         }
     } else {
-        // Show helpful error message
-        const errorMsg = lastError?.message?.includes('Failed') || lastError?.message?.includes('fetch')
-            ? 'Virhe uutisissa (yritä myöhemmin uudelleen)'
-            : 'Uutisia ei saatavilla';
+        const errorMsg = 'Virhe uutisissa - yritä myöhemmin uudelleen.';
         newsContent.innerHTML = `<div class="error">${errorMsg}</div>`;
         console.error('News error:', lastError);
     }
