@@ -47,11 +47,11 @@ const COMICS = {
 // on darkball.net. They fall back to links.
 
 // Initialize
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     loadWeather();
     loadNameday();
-    await loadComics();
-    await loadNews();
+    loadComics();
+    loadNews();
 });
 
 // Weather
@@ -622,6 +622,11 @@ async function loadComics() {
         return;
     }
 
+    // Add timeout for all comic fetches
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+    );
+
     // Fetch comics in parallel
     const comicPromises = comicsForDay.map(async (comic) => {
         if (!comic.feed) {
@@ -634,17 +639,27 @@ async function loadComics() {
         }
         
         try {
-            // Use r.jina.ai proxy to fetch the RSS feed
-            const proxyUrl = `https://r.jina.ai/${comic.feed}`;
-            const response = await fetch(proxyUrl, {
-                headers: { 'Accept': 'text/plain; charset=utf-8' }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+            // Try direct fetch first (darkball.net might allow CORS)
+            let text;
+            try {
+                const directResponse = await fetch(comic.feed);
+                if (directResponse.ok) {
+                    text = await directResponse.text();
+                } else {
+                    throw new Error('Direct fetch failed');
+                }
+            } catch (directError) {
+                // Fall back to r.jina.ai proxy
+                const proxyUrl = `https://r.jina.ai/${comic.feed}`;
+                const proxyResponse = await fetch(proxyUrl, {
+                    headers: { 'Accept': 'text/plain; charset=utf-8' }
+                });
+                if (!proxyResponse.ok) {
+                    throw new Error(`Proxy HTTP ${proxyResponse.status}`);
+                }
+                text = await proxyResponse.text();
             }
             
-            const text = await response.text();
             // Parse the RSS feed to get the latest comic image
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(text, 'text/xml');
@@ -673,9 +688,15 @@ async function loadComics() {
         }
     });
 
-    const comics = await Promise.all(comicPromises);
-    
-    comicsContent.innerHTML = '';
+    try {
+        const comics = await Promise.race([
+            Promise.all(comicPromises),
+            timeoutPromise
+        ]);
+        
+        comicsContent.innerHTML = '';
+        
+        comics.forEach(comic => {
     
     comics.forEach(comic => {
         const comicDiv = document.createElement('div');
@@ -711,6 +732,29 @@ async function loadComics() {
         
         comicsContent.appendChild(comicDiv);
     });
+    } catch (error) {
+        console.error('Comics loading timed out or failed:', error.message);
+        // Fall back to showing links only
+        comicsContent.innerHTML = '';
+        comicsForDay.forEach(comic => {
+            const comicDiv = document.createElement('div');
+            comicDiv.className = 'comic';
+            
+            const title = document.createElement('div');
+            title.className = 'comic-title';
+            title.textContent = comic.name;
+            comicDiv.appendChild(title);
+            
+            const link = document.createElement('a');
+            link.href = `https://www.hs.fi/sarjakuvat/${comic.id}`;
+            link.className = 'comic-link';
+            link.target = '_blank';
+            link.textContent = 'Avaa sarjakuva →';
+            comicDiv.appendChild(link);
+            
+            comicsContent.appendChild(comicDiv);
+        });
+    }
 }
 
 // News - Uses r.jina.ai CORS proxy to fetch Yle RSS feed
@@ -725,94 +769,105 @@ async function loadNews() {
     ];
     
     let items = [];
-    let lastError = null;
     
-    // Try each feed URL with different proxy strategies
-    for (const feedUrl of feedUrls) {
-        // Strategy 1: Use r.jina.ai proxy
-        try {
-            const proxyUrl = `https://r.jina.ai/${feedUrl}`;
-            console.log(`Trying proxy: ${proxyUrl}`);
-            const response = await fetch(proxyUrl, { 
-                headers: {
-                    'Accept': 'text/plain; charset=utf-8'
+    // Add timeout for news loading
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+    );
+    
+    try {
+        await Promise.race([
+            (async () => {
+                // Try each feed URL with different proxy strategies
+                for (const feedUrl of feedUrls) {
+                    // Strategy 1: Use r.jina.ai proxy
+                    try {
+                        const proxyUrl = `https://r.jina.ai/${feedUrl}`;
+                        console.log(`Trying proxy: ${proxyUrl}`);
+                        const response = await fetch(proxyUrl, { 
+                            headers: {
+                                'Accept': 'text/plain; charset=utf-8'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const text = await response.text();
+                            const parsedItems = parseMarkdownNews(text);
+                            if (parsedItems.length > 0) {
+                                items = parsedItems;
+                                console.log(`Successfully loaded ${items.length} news items from r.jina.ai`);
+                                return;
+                            }
+                        } else {
+                            console.warn(`r.jina.ai returned ${response.status}`);
+                        }
+                    } catch (error) {
+                        console.warn(`r.jina.ai failed:`, error.message);
+                    }
+                    
+                    // Strategy 2: Try direct fetch (might work from some origins)
+                    try {
+                        console.log(`Trying direct fetch: ${feedUrl}`);
+                        const response = await fetch(feedUrl);
+                        if (response.ok) {
+                            const xmlText = await response.text();
+                            const parser = new DOMParser();
+                            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+                            const foundItems = xmlDoc.querySelectorAll('item');
+                            if (foundItems.length > 0) {
+                                items = Array.from(foundItems).map(item => ({
+                                    title: item.querySelector('title')?.textContent || 'Ei otsikkoa',
+                                    description: item.querySelector('description')?.textContent || '',
+                                    link: item.querySelector('link')?.textContent || '#'
+                                }));
+                                console.log(`Successfully loaded ${items.length} news items directly`);
+                                return;
+                            }
+                        }
+                    } catch (error) {
+                        console.warn(`Direct fetch failed:`, error.message);
+                    }
                 }
-            });
-            
-            if (response.ok) {
-                const text = await response.text();
-                const parsedItems = parseMarkdownNews(text);
-                if (parsedItems.length > 0) {
-                    items = parsedItems;
-                    console.log(`Successfully loaded ${items.length} news items from r.jina.ai`);
-                    break;
-                }
-            } else {
-                console.warn(`r.jina.ai returned ${response.status}`);
-            }
-        } catch (error) {
-            console.warn(`r.jina.ai failed:`, error.message);
-        }
+            })(),
+            timeoutPromise
+        ]);
         
-        // Strategy 2: Try direct fetch (might work from some origins)
-        try {
-            console.log(`Trying direct fetch: ${feedUrl}`);
-            const response = await fetch(feedUrl);
-            if (response.ok) {
-                const xmlText = await response.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-                const foundItems = xmlDoc.querySelectorAll('item');
-                if (foundItems.length > 0) {
-                    items = Array.from(foundItems).map(item => ({
-                        title: item.querySelector('title')?.textContent || 'Ei otsikkoa',
-                        description: item.querySelector('description')?.textContent || '',
-                        link: item.querySelector('link')?.textContent || '#'
-                    }));
-                    console.log(`Successfully loaded ${items.length} news items directly`);
-                    break;
-                }
-            }
-        } catch (error) {
-            console.warn(`Direct fetch failed:`, error.message);
-        }
+        newsContent.innerHTML = '';
         
-        if (items.length > 0) break;
-    }
-    
-    newsContent.innerHTML = '';
-    
-    if (items.length > 0) {
-        // Take first 5 items
-        const itemsToShow = Math.min(items.length, 5);
-        for (let i = 0; i < itemsToShow; i++) {
-            const item = items[i];
-            const newsItem = document.createElement('div');
-            newsItem.className = 'news-item';
-            
-            const titleEl = document.createElement('div');
-            titleEl.className = 'news-title';
-            titleEl.textContent = item.title || 'Ei otsikkoa';
-            newsItem.appendChild(titleEl);
-            
-            const summaryEl = document.createElement('div');
-            summaryEl.className = 'news-summary';
-            summaryEl.textContent = item.description || item.title || '';
-            newsItem.appendChild(summaryEl);
-            
-            const linkEl = document.createElement('a');
-            linkEl.href = item.link || '#';
-            linkEl.className = 'news-link';
-            linkEl.target = '_blank';
-            linkEl.textContent = 'Lue lisää →';
-            newsItem.appendChild(linkEl);
-            
-            newsContent.appendChild(newsItem);
+        if (items.length > 0) {
+            // Take first 5 items
+            const itemsToShow = Math.min(items.length, 5);
+            for (let i = 0; i < itemsToShow; i++) {
+                const item = items[i];
+                const newsItem = document.createElement('div');
+                newsItem.className = 'news-item';
+                
+                const titleEl = document.createElement('div');
+                titleEl.className = 'news-title';
+                titleEl.textContent = item.title || 'Ei otsikkoa';
+                newsItem.appendChild(titleEl);
+                
+                const summaryEl = document.createElement('div');
+                summaryEl.className = 'news-summary';
+                summaryEl.textContent = item.description || item.title || '';
+                newsItem.appendChild(summaryEl);
+                
+                const linkEl = document.createElement('a');
+                linkEl.href = item.link || '#';
+                linkEl.className = 'news-link';
+                linkEl.target = '_blank';
+                linkEl.textContent = 'Lue lisää →';
+                newsItem.appendChild(linkEl);
+                
+                newsContent.appendChild(newsItem);
+            }
+        } else {
+            const errorMsg = 'Virhe uutisissa - palvelin estää pyyntöjä. Kokeile myöhemmin uudelleen.';
+            newsContent.innerHTML = `<div class="error">${errorMsg}</div>`;
         }
-    } else {
-        const errorMsg = 'Virhe uutisissa - palvelin estää pyyntöjä. Kokeile myöhemmin uudelleen.';
-        newsContent.innerHTML = `<div class="error">${errorMsg}</div>`;
-        console.error('News error:', lastError);
+    } catch (error) {
+        console.error('News loading timed out or failed:', error.message);
+        newsContent.innerHTML = '<div class="error">Virhe uutisissa - yritä myöhemmin uudelleen</div>';
     }
 }
 
