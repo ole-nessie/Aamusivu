@@ -712,11 +712,24 @@ async function loadNews() {
             const item = items[i];
             const newsItem = document.createElement('div');
             newsItem.className = 'news-item';
-            newsItem.innerHTML = `
-                <div class="news-title">${item.title || 'Ei otsikkoa'}</div>
-                <div class="news-summary">${item.description || item.title || ''}</div>
-                <a href="${item.link || '#'}" class="news-link" target="_blank">Lue lisää →</a>
-            `;
+            
+            const titleEl = document.createElement('div');
+            titleEl.className = 'news-title';
+            titleEl.textContent = item.title || 'Ei otsikkoa';
+            newsItem.appendChild(titleEl);
+            
+            const summaryEl = document.createElement('div');
+            summaryEl.className = 'news-summary';
+            summaryEl.textContent = item.description || item.title || '';
+            newsItem.appendChild(summaryEl);
+            
+            const linkEl = document.createElement('a');
+            linkEl.href = item.link || '#';
+            linkEl.className = 'news-link';
+            linkEl.target = '_blank';
+            linkEl.textContent = 'Lue lisää →';
+            newsItem.appendChild(linkEl);
+            
             newsContent.appendChild(newsItem);
         }
     } else {
