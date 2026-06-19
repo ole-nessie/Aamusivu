@@ -5,30 +5,53 @@ const LOCATIONS = [
     { name: 'Lammi', lat: 61.0347, lon: 25.0422 }
 ];
 
+// Comics with RSS feeds from darkball.net
 const COMICS = {
-    0: ['lassi-ja-leevi', 'keskenkasvuisia'], // Sunday
-    1: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    2: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    3: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    4: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    5: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    6: ['fingerpori', 'fok_it', 'harald-hirmuinen']
+    0: [
+        { id: 'lassi-ja-leevi', name: 'Lassi ja Leevi', feed: null },
+        { id: 'keskenkasvuisia', name: 'Keskenkasvuisia', feed: null }
+    ], // Sunday
+    1: [
+        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
+        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
+        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
+    ],
+    2: [
+        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
+        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
+        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
+    ],
+    3: [
+        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
+        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
+        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
+    ],
+    4: [
+        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
+        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
+        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
+    ],
+    5: [
+        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
+        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
+        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
+    ],
+    6: [
+        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
+        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
+        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
+    ]
 };
 
-const COMIC_DISPLAY_NAMES = {
-    'fingerpori': 'Fingerpori',
-    'fok_it': 'Fok_It',
-    'harald-hirmuinen': 'Harald Hirmuinen',
-    'lassi-ja-leevi': 'Lassi ja Leevi',
-    'keskenkasvuisia': 'Keskenkasvuisia'
-};
+// Note: Harald Hirmuinen, Lassi ja Leevi, and Keskenkasvuisia don't have public RSS feeds
+// on darkball.net. They fall back to links.
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadWeather();
     loadNameday();
-    loadComics();
-    loadNews();
+    await loadComics();
+    await loadNews();
 });
 
 // Weather
@@ -585,36 +608,107 @@ function getFinnishNamedays() {
     };
 }
 
-// Comics section - simple links (works on mobile with HS login)
-function loadComics() {
+// Comics section - fetch images from RSS feeds and display them directly
+async function loadComics() {
     const today = new Date();
     const dayOfWeek = today.getDay();
     const comicsForDay = COMICS[dayOfWeek] || [];
 
     const comicsContent = document.getElementById('comicsContent');
-    comicsContent.innerHTML = '';
+    comicsContent.innerHTML = '<div class="loading">Ladataan sarjakuvia...</div>';
 
     if (comicsForDay.length === 0) {
         comicsContent.innerHTML = '<div class="loading">Ei sarjakuvia tänään</div>';
         return;
     }
 
-    comicsForDay.forEach(comicId => {
+    // Fetch comics in parallel
+    const comicPromises = comicsForDay.map(async (comic) => {
+        if (!comic.feed) {
+            // No RSS feed available, just show title and link
+            return {
+                name: comic.name,
+                imageUrl: null,
+                link: `https://www.hs.fi/sarjakuvat/${comic.id}`
+            };
+        }
+        
+        try {
+            // Use r.jina.ai proxy to fetch the RSS feed
+            const proxyUrl = `https://r.jina.ai/${comic.feed}`;
+            const response = await fetch(proxyUrl, {
+                headers: { 'Accept': 'text/plain; charset=utf-8' }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const text = await response.text();
+            // Parse the RSS feed to get the latest comic image
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, 'text/xml');
+            const firstItem = xmlDoc.querySelector('item');
+            
+            if (firstItem) {
+                const description = firstItem.querySelector('description')?.textContent || '';
+                const imgMatch = description.match(/<img[^>]+src="([^"]+)"/);
+                const imageUrl = imgMatch ? imgMatch[1] : null;
+                const link = firstItem.querySelector('link')?.textContent || 
+                           firstItem.querySelector('guid')?.textContent || null;
+                
+                return {
+                    name: comic.name,
+                    imageUrl: imageUrl,
+                    link: link || `https://www.hs.fi/sarjakuvat/${comic.id}`
+                };
+            }
+        } catch (error) {
+            console.warn(`Failed to load comic ${comic.name}:`, error.message);
+            return {
+                name: comic.name,
+                imageUrl: null,
+                link: `https://www.hs.fi/sarjakuvat/${comic.id}`
+            };
+        }
+    });
+
+    const comics = await Promise.all(comicPromises);
+    
+    comicsContent.innerHTML = '';
+    
+    comics.forEach(comic => {
         const comicDiv = document.createElement('div');
         comicDiv.className = 'comic';
         
         const title = document.createElement('div');
         title.className = 'comic-title';
-        title.textContent = COMIC_DISPLAY_NAMES[comicId];
+        title.textContent = comic.name;
         comicDiv.appendChild(title);
-
-        const link = document.createElement('a');
-        link.href = `https://www.hs.fi/sarjakuvat/${comicId}`;
-        link.className = 'comic-link';
-        link.target = '_blank';
-        link.textContent = 'Avaa sarjakuva →';
-        comicDiv.appendChild(link);
-
+        
+        if (comic.imageUrl) {
+            const img = document.createElement('img');
+            img.src = comic.imageUrl;
+            img.alt = comic.name;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            comicDiv.appendChild(img);
+            
+            const link = document.createElement('a');
+            link.href = comic.link;
+            link.className = 'comic-link';
+            link.target = '_blank';
+            link.textContent = 'HS.fi →';
+            comicDiv.appendChild(link);
+        } else {
+            const link = document.createElement('a');
+            link.href = comic.link;
+            link.className = 'comic-link';
+            link.target = '_blank';
+            link.textContent = 'Avaa sarjakuva →';
+            comicDiv.appendChild(link);
+        }
+        
         comicsContent.appendChild(comicDiv);
     });
 }
