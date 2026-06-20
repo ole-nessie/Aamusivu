@@ -619,18 +619,45 @@ function loadComics() {
     });
 }
 
-// News
+// News - Use Yle's public RSS feed via CORS proxy
 async function loadNews() {
+    const newsContent = document.getElementById('newsContent');
+    newsContent.innerHTML = '<div class="loading">Ladataan...</div>';
+    
     try {
-        // Use RSS feed as the JSON endpoint is no longer available
-        const response = await fetch('https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET');
-        const xmlText = await response.text();
+        // Use r.jina.ai CORS proxy to fetch Yle RSS feed
+        const proxyUrl = 'https://r.jina.ai/https://yle.fi/rss/uutiset/tuoreimmat';
+        const response = await fetch(proxyUrl);
+        const text = await response.text();
 
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-        const items = xmlDoc.querySelectorAll('item');
+        // Parse the markdown format returned by r.jina.ai
+        // Format: ### [title](url)\ndescription
+        const lines = text.split('\n');
+        const items = [];
+        let currentItem = null;
+        
+        for (const line of lines) {
+            const match = line.match(/^### \[(.+?)\]\((.+?)\)/);
+            if (match) {
+                if (currentItem) items.push(currentItem);
+                currentItem = {
+                    title: match[1],
+                    link: match[2],
+                    description: ''
+                };
+            } else if (currentItem && line && !line.startsWith('[') && 
+                      !line.startsWith('Title:') && !line.startsWith('URL Source:') &&
+                      !line.startsWith('Markdown') && !line.startsWith('#') && 
+                      !line.match(/^https?:/) && line.trim() !== '') {
+                if (currentItem.description) {
+                    currentItem.description += ' ' + line.trim();
+                } else {
+                    currentItem.description = line.trim();
+                }
+            }
+        }
+        if (currentItem) items.push(currentItem);
 
-        const newsContent = document.getElementById('newsContent');
         newsContent.innerHTML = '';
 
         if (items.length > 0) {
@@ -638,17 +665,26 @@ async function loadNews() {
             const itemsToShow = Math.min(items.length, 5);
             for (let i = 0; i < itemsToShow; i++) {
                 const item = items[i];
-                const title = item.querySelector('title')?.textContent || 'Ei otsikkoa';
-                const description = item.querySelector('description')?.textContent || '';
-                const link = item.querySelector('link')?.textContent || '#';
-
                 const newsItem = document.createElement('div');
                 newsItem.className = 'news-item';
-                newsItem.innerHTML = `
-                    <div class="news-title">${title}</div>
-                    <div class="news-summary">${description || title}</div>
-                    <a href="${link}" class="news-link" target="_blank">Lue lisää →</a>
-                `;
+                
+                const titleEl = document.createElement('div');
+                titleEl.className = 'news-title';
+                titleEl.textContent = item.title || 'Ei otsikkoa';
+                newsItem.appendChild(titleEl);
+                
+                const summaryEl = document.createElement('div');
+                summaryEl.className = 'news-summary';
+                summaryEl.textContent = item.description || item.title || '';
+                newsItem.appendChild(summaryEl);
+                
+                const linkEl = document.createElement('a');
+                linkEl.href = item.link || '#';
+                linkEl.className = 'news-link';
+                linkEl.target = '_blank';
+                linkEl.textContent = 'Lue lisää →';
+                newsItem.appendChild(linkEl);
+                
                 newsContent.appendChild(newsItem);
             }
         } else {
