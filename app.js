@@ -23,6 +23,15 @@ const COMIC_DISPLAY_NAMES = {
     'keskenkasvuisia': 'Keskenkasvuisia'
 };
 
+// Mapping from internal comic IDs to HS.fi URL paths
+const COMIC_URL_PATHS = {
+    'fingerpori': 'fingerpori',
+    'fok_it': 'fokit',
+    'harald-hirmuinen': 'haraldhirmuinen',
+    'lassi-ja-leevi': 'lassijaleevi',
+    'keskenkasvuisia': 'keskenkasvuisia'
+};
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadWeather();
@@ -601,8 +610,11 @@ async function loadComics() {
 
     for (const comicId of comicsForDay) {
         try {
+            // Get the URL path for this comic ID
+            const urlPath = COMIC_URL_PATHS[comicId] || comicId;
+            
             // Step 1: Fetch the comic list page
-            const listUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${comicId}/`;
+            const listUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${urlPath}/`;
             const listResponse = await fetch(listUrl);
             const listText = await listResponse.text();
             
@@ -613,7 +625,7 @@ async function loadComics() {
                 const carId = carMatch[0]; // e.g., "car-2000012083210.html"
                 
                 // Step 3: Fetch the specific comic page
-                const comicUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${comicId}/${carId}`;
+                const comicUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${urlPath}/${carId}`;
                 const comicResponse = await fetch(comicUrl);
                 const comicText = await comicResponse.text();
                 
@@ -660,8 +672,9 @@ async function loadComics() {
             title.textContent = COMIC_DISPLAY_NAMES[comicId];
             comicDiv.appendChild(title);
             
+            const urlPath = COMIC_URL_PATHS[comicId] || comicId;
             const link = document.createElement('a');
-            link.href = `https://www.hs.fi/sarjakuvat/${comicId}/`;
+            link.href = `https://www.hs.fi/sarjakuvat/${urlPath}/`;
             link.className = 'comic-link';
             link.target = '_blank';
             link.textContent = 'Avaa sarjakuva';
