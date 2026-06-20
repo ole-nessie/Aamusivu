@@ -777,7 +777,7 @@ async function loadHSNews() {
         // Parse markdown to extract article titles and URLs
         // Format: "## [Title](url)" or "## Title](url)"
         const items = [];
-        const titleRegex = /^\d+\.\s*##\s*\[?([^\]\n]+)\]?\((https:\/\/www\.hs\.fi\/[^)]+)\)/gm;
+        const titleRegex = /##\s*\[?([^\]\)\n]+)\]?\((https:\/\/www\.hs\.fi\/[^\)]+)\)/g;
         let match;
         
         while ((match = titleRegex.exec(text)) !== null) {
