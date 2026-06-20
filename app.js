@@ -5,46 +5,23 @@ const LOCATIONS = [
     { name: 'Lammi', lat: 61.0347, lon: 25.0422 }
 ];
 
-// Comics with RSS feeds from darkball.net
 const COMICS = {
-    0: [
-        { id: 'lassi-ja-leevi', name: 'Lassi ja Leevi', feed: null },
-        { id: 'keskenkasvuisia', name: 'Keskenkasvuisia', feed: null }
-    ], // Sunday
-    1: [
-        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
-        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
-        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
-    ],
-    2: [
-        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
-        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
-        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
-    ],
-    3: [
-        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
-        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
-        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
-    ],
-    4: [
-        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
-        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
-        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
-    ],
-    5: [
-        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
-        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
-        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
-    ],
-    6: [
-        { id: 'fingerpori', name: 'Fingerpori', feed: 'https://darkball.net/rssfeeds/fingerpori/' },
-        { id: 'fok_it', name: 'Fok_It', feed: 'https://darkball.net/rssfeeds/fokit/' },
-        { id: 'villeranta', name: 'Ville Ranta', feed: 'https://darkball.net/rssfeeds/villeranta/' }
-    ]
+    0: ['lassi-ja-leevi', 'keskenkasvuisia'], // Sunday
+    1: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
+    2: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
+    3: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
+    4: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
+    5: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
+    6: ['fingerpori', 'fok_it', 'harald-hirmuinen']
 };
 
-// Note: Harald Hirmuinen, Lassi ja Leevi, and Keskenkasvuisia don't have public RSS feeds
-// on darkball.net. They fall back to links.
+const COMIC_DISPLAY_NAMES = {
+    'fingerpori': 'Fingerpori',
+    'fok_it': 'Fok_It',
+    'harald-hirmuinen': 'Harald Hirmuinen',
+    'lassi-ja-leevi': 'Lassi ja Leevi',
+    'keskenkasvuisia': 'Keskenkasvuisia'
+};
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -608,303 +585,77 @@ function getFinnishNamedays() {
     };
 }
 
-// Comics section - fetch images from RSS feeds and display them directly
-async function loadComics() {
+// Comics section - simple links (works on mobile with HS login)
+function loadComics() {
     const today = new Date();
     const dayOfWeek = today.getDay();
     const comicsForDay = COMICS[dayOfWeek] || [];
 
     const comicsContent = document.getElementById('comicsContent');
-    comicsContent.innerHTML = '<div class="loading">Ladataan sarjakuvia...</div>';
+    comicsContent.innerHTML = '';
 
     if (comicsForDay.length === 0) {
         comicsContent.innerHTML = '<div class="loading">Ei sarjakuvia tänään</div>';
         return;
     }
 
-    // Add timeout for all comic fetches
-    const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 10000)
-    );
-
-    // Fetch comics in parallel
-    const comicPromises = comicsForDay.map(async (comic) => {
-        if (!comic.feed) {
-            // No RSS feed available, just show title and link
-            return {
-                name: comic.name,
-                imageUrl: null,
-                link: `https://www.hs.fi/sarjakuvat/${comic.id}`
-            };
-        }
-        
-        try {
-            // Try direct fetch first (darkball.net might allow CORS)
-            let text;
-            try {
-                const directResponse = await fetch(comic.feed);
-                if (directResponse.ok) {
-                    text = await directResponse.text();
-                } else {
-                    throw new Error('Direct fetch failed');
-                }
-            } catch (directError) {
-                // Fall back to r.jina.ai proxy
-                const proxyUrl = `https://r.jina.ai/${comic.feed}`;
-                const proxyResponse = await fetch(proxyUrl, {
-                    headers: { 'Accept': 'text/plain; charset=utf-8' }
-                });
-                if (!proxyResponse.ok) {
-                    throw new Error(`Proxy HTTP ${proxyResponse.status}`);
-                }
-                text = await proxyResponse.text();
-            }
-            
-            // Parse the RSS feed to get the latest comic image
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(text, 'text/xml');
-            const firstItem = xmlDoc.querySelector('item');
-            
-            if (firstItem) {
-                const description = firstItem.querySelector('description')?.textContent || '';
-                const imgMatch = description.match(/<img[^>]+src="([^"]+)"/);
-                const imageUrl = imgMatch ? imgMatch[1] : null;
-                const link = firstItem.querySelector('link')?.textContent || 
-                           firstItem.querySelector('guid')?.textContent || null;
-                
-                return {
-                    name: comic.name,
-                    imageUrl: imageUrl,
-                    link: link || `https://www.hs.fi/sarjakuvat/${comic.id}`
-                };
-            }
-        } catch (error) {
-            console.warn(`Failed to load comic ${comic.name}:`, error.message);
-            return {
-                name: comic.name,
-                imageUrl: null,
-                link: `https://www.hs.fi/sarjakuvat/${comic.id}`
-            };
-        }
-    });
-
-    try {
-        const comics = await Promise.race([
-            Promise.all(comicPromises),
-            timeoutPromise
-        ]);
-        
-        comicsContent.innerHTML = '';
-        
-        comics.forEach(comic => {
-    
-    comics.forEach(comic => {
+    comicsForDay.forEach(comicId => {
         const comicDiv = document.createElement('div');
         comicDiv.className = 'comic';
         
         const title = document.createElement('div');
         title.className = 'comic-title';
-        title.textContent = comic.name;
+        title.textContent = COMIC_DISPLAY_NAMES[comicId];
         comicDiv.appendChild(title);
-        
-        if (comic.imageUrl) {
-            const img = document.createElement('img');
-            img.src = comic.imageUrl;
-            img.alt = comic.name;
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            comicDiv.appendChild(img);
-            
-            const link = document.createElement('a');
-            link.href = comic.link;
-            link.className = 'comic-link';
-            link.target = '_blank';
-            link.textContent = 'HS.fi →';
-            comicDiv.appendChild(link);
-        } else {
-            const link = document.createElement('a');
-            link.href = comic.link;
-            link.className = 'comic-link';
-            link.target = '_blank';
-            link.textContent = 'Avaa sarjakuva →';
-            comicDiv.appendChild(link);
-        }
-        
+
+        const link = document.createElement('a');
+        link.href = `https://www.hs.fi/sarjakuvat/${comicId}`;
+        link.className = 'comic-link';
+        link.target = '_blank';
+        link.textContent = 'Avaa sarjakuva →';
+        comicDiv.appendChild(link);
+
         comicsContent.appendChild(comicDiv);
     });
-    } catch (error) {
-        console.error('Comics loading timed out or failed:', error.message);
-        // Fall back to showing links only
-        comicsContent.innerHTML = '';
-        comicsForDay.forEach(comic => {
-            const comicDiv = document.createElement('div');
-            comicDiv.className = 'comic';
-            
-            const title = document.createElement('div');
-            title.className = 'comic-title';
-            title.textContent = comic.name;
-            comicDiv.appendChild(title);
-            
-            const link = document.createElement('a');
-            link.href = `https://www.hs.fi/sarjakuvat/${comic.id}`;
-            link.className = 'comic-link';
-            link.target = '_blank';
-            link.textContent = 'Avaa sarjakuva →';
-            comicDiv.appendChild(link);
-            
-            comicsContent.appendChild(comicDiv);
-        });
-    }
 }
 
-// News - Uses r.jina.ai CORS proxy to fetch Yle RSS feed
-// r.jina.ai converts RSS to markdown format which is easy to parse
+// News
 async function loadNews() {
-    const newsContent = document.getElementById('newsContent');
-    newsContent.innerHTML = '<div class="loading">Ladataan uutisia...</div>';
-    
-    const feedUrls = [
-        'https://yle.fi/rss/uutiset/tuoreimmat',
-        'https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET'
-    ];
-    
-    let items = [];
-    
-    // Add timeout for news loading
-    const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 10000)
-    );
-    
     try {
-        await Promise.race([
-            (async () => {
-                // Try each feed URL with different proxy strategies
-                for (const feedUrl of feedUrls) {
-                    // Strategy 1: Use r.jina.ai proxy
-                    try {
-                        const proxyUrl = `https://r.jina.ai/${feedUrl}`;
-                        console.log(`Trying proxy: ${proxyUrl}`);
-                        const response = await fetch(proxyUrl, { 
-                            headers: {
-                                'Accept': 'text/plain; charset=utf-8'
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            const text = await response.text();
-                            const parsedItems = parseMarkdownNews(text);
-                            if (parsedItems.length > 0) {
-                                items = parsedItems;
-                                console.log(`Successfully loaded ${items.length} news items from r.jina.ai`);
-                                return;
-                            }
-                        } else {
-                            console.warn(`r.jina.ai returned ${response.status}`);
-                        }
-                    } catch (error) {
-                        console.warn(`r.jina.ai failed:`, error.message);
-                    }
-                    
-                    // Strategy 2: Try direct fetch (might work from some origins)
-                    try {
-                        console.log(`Trying direct fetch: ${feedUrl}`);
-                        const response = await fetch(feedUrl);
-                        if (response.ok) {
-                            const xmlText = await response.text();
-                            const parser = new DOMParser();
-                            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-                            const foundItems = xmlDoc.querySelectorAll('item');
-                            if (foundItems.length > 0) {
-                                items = Array.from(foundItems).map(item => ({
-                                    title: item.querySelector('title')?.textContent || 'Ei otsikkoa',
-                                    description: item.querySelector('description')?.textContent || '',
-                                    link: item.querySelector('link')?.textContent || '#'
-                                }));
-                                console.log(`Successfully loaded ${items.length} news items directly`);
-                                return;
-                            }
-                        }
-                    } catch (error) {
-                        console.warn(`Direct fetch failed:`, error.message);
-                    }
-                }
-            })(),
-            timeoutPromise
-        ]);
-        
+        // Use RSS feed as the JSON endpoint is no longer available
+        const response = await fetch('https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET');
+        const xmlText = await response.text();
+
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        const items = xmlDoc.querySelectorAll('item');
+
+        const newsContent = document.getElementById('newsContent');
         newsContent.innerHTML = '';
-        
+
         if (items.length > 0) {
             // Take first 5 items
             const itemsToShow = Math.min(items.length, 5);
             for (let i = 0; i < itemsToShow; i++) {
                 const item = items[i];
+                const title = item.querySelector('title')?.textContent || 'Ei otsikkoa';
+                const description = item.querySelector('description')?.textContent || '';
+                const link = item.querySelector('link')?.textContent || '#';
+
                 const newsItem = document.createElement('div');
                 newsItem.className = 'news-item';
-                
-                const titleEl = document.createElement('div');
-                titleEl.className = 'news-title';
-                titleEl.textContent = item.title || 'Ei otsikkoa';
-                newsItem.appendChild(titleEl);
-                
-                const summaryEl = document.createElement('div');
-                summaryEl.className = 'news-summary';
-                summaryEl.textContent = item.description || item.title || '';
-                newsItem.appendChild(summaryEl);
-                
-                const linkEl = document.createElement('a');
-                linkEl.href = item.link || '#';
-                linkEl.className = 'news-link';
-                linkEl.target = '_blank';
-                linkEl.textContent = 'Lue lisää →';
-                newsItem.appendChild(linkEl);
-                
+                newsItem.innerHTML = `
+                    <div class="news-title">${title}</div>
+                    <div class="news-summary">${description || title}</div>
+                    <a href="${link}" class="news-link" target="_blank">Lue lisää →</a>
+                `;
                 newsContent.appendChild(newsItem);
             }
         } else {
-            const errorMsg = 'Virhe uutisissa - palvelin estää pyyntöjä. Kokeile myöhemmin uudelleen.';
-            newsContent.innerHTML = `<div class="error">${errorMsg}</div>`;
+            newsContent.innerHTML = '<div class="error">Uutisia ei saatavilla</div>';
         }
     } catch (error) {
-        console.error('News loading timed out or failed:', error.message);
-        newsContent.innerHTML = '<div class="error">Virhe uutisissa - yritä myöhemmin uudelleen</div>';
+        console.error('News error:', error);
+        document.getElementById('newsContent').innerHTML = '<div class="error">Virhe uutisissa</div>';
     }
-}
-
-// Helper function to parse markdown news format from r.jina.ai
-function parseMarkdownNews(text) {
-    const lines = text.split('\n');
-    const parsedItems = [];
-    let currentItem = null;
-    
-    for (const line of lines) {
-        if (line.startsWith('### [')) {
-            // New item - extract title and URL
-            if (currentItem) parsedItems.push(currentItem);
-            const match = line.match(/### \[(.+?)\]\((.+?)\)/);
-            if (match) {
-                currentItem = {
-                    title: match[1],
-                    link: match[2],
-                    description: ''
-                };
-            }
-        } else if (currentItem && line && !line.startsWith('[') && !line.startsWith('Title:') && 
-                  !line.startsWith('URL Source:') && !line.startsWith('Markdown Content:') &&
-                  !line.startsWith('#') && !line.startsWith('---') && line.trim() !== '') {
-            // This is part of the description
-            if (line.match(/^https?:/) || line.match(/^[A-Z][a-z]{2}, \d/)) {
-                // Skip URL lines and date lines
-                continue;
-            }
-            if (currentItem.description) {
-                currentItem.description += ' ' + line.trim();
-            } else {
-                currentItem.description = line.trim();
-            }
-        }
-    }
-    
-    if (currentItem) parsedItems.push(currentItem);
-    return parsedItems;
 }
