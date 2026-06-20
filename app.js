@@ -6,7 +6,7 @@ const LOCATIONS = [
 ];
 
 const COMICS = {
-    0: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia'],
+    0: ['lassi-ja-leevi', 'keskenkasvuisia'],
     1: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi'],
     2: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi'],
     3: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi'],
