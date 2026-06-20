@@ -601,56 +601,54 @@ async function loadComics() {
 
     for (const comicId of comicsForDay) {
         try {
-            // Fetch the comic page via CORS proxy
-            const proxyUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${comicId}/`;
-            const response = await fetch(proxyUrl);
-            const text = await response.text();
+            // Step 1: Fetch the comic list page
+            const listUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${comicId}/`;
+            const listResponse = await fetch(listUrl);
+            const listText = await listResponse.text();
             
-            // Extract image hash from the page
-            const hashMatch = text.match(/https:\/\/images\.sanoma-sndp\.fi\/([a-f0-9]+)\/some\/hs-cartoons\.jpg/);
+            // Step 2: Extract the latest car- ID
+            const carMatch = listText.match(/car-([0-9]+)\.html/);
             
-            if (hashMatch) {
-                const hash = hashMatch[1];
-                const imgUrl = `https://images.sanoma-sndp.fi/${hash}/normal/978.jpg`;
+            if (carMatch) {
+                const carId = carMatch[0]; // e.g., "car-2000012083210.html"
                 
-                // Create comic container
-                const comicDiv = document.createElement('div');
-                comicDiv.className = 'comic';
+                // Step 3: Fetch the specific comic page
+                const comicUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${comicId}/${carId}`;
+                const comicResponse = await fetch(comicUrl);
+                const comicText = await comicResponse.text();
                 
-                const title = document.createElement('div');
-                title.className = 'comic-title';
-                title.textContent = COMIC_DISPLAY_NAMES[comicId];
-                comicDiv.appendChild(title);
+                // Step 4: Extract the image hash
+                const hashMatch = comicText.match(/https:\/\/images\.sanoma-sndp\.fi\/([a-f0-9]+)\/normal\/978\.jpg/);
                 
-                const img = document.createElement('img');
-                img.src = imgUrl;
-                img.alt = COMIC_DISPLAY_NAMES[comicId] || comicId;
-                img.className = 'comic-image';
-                img.onerror = function() {
-                    this.parentNode.innerHTML = '<div class="loading">Sarjakuvaa ei saatavilla</div>';
-                };
-                
-                comicDiv.appendChild(img);
-                comicsContent.appendChild(comicDiv);
-            } else {
-                // Fallback: just show the link
-                const comicDiv = document.createElement('div');
-                comicDiv.className = 'comic';
-                
-                const title = document.createElement('div');
-                title.className = 'comic-title';
-                title.textContent = COMIC_DISPLAY_NAMES[comicId];
-                comicDiv.appendChild(title);
-                
-                const link = document.createElement('a');
-                link.href = `https://www.hs.fi/sarjakuvat/${comicId}/`;
-                link.className = 'comic-link';
-                link.target = '_blank';
-                link.textContent = 'Avaa sarjakuva →';
-                comicDiv.appendChild(link);
-                
-                comicsContent.appendChild(comicDiv);
+                if (hashMatch) {
+                    const hash = hashMatch[1];
+                    const imgUrl = `https://images.sanoma-sndp.fi/${hash}/normal/978.jpg`;
+                    
+                    // Create comic container
+                    const comicDiv = document.createElement('div');
+                    comicDiv.className = 'comic';
+                    
+                    const title = document.createElement('div');
+                    title.className = 'comic-title';
+                    title.textContent = COMIC_DISPLAY_NAMES[comicId];
+                    comicDiv.appendChild(title);
+                    
+                    const img = document.createElement('img');
+                    img.src = imgUrl;
+                    img.alt = COMIC_DISPLAY_NAMES[comicId] || comicId;
+                    img.className = 'comic-image';
+                    img.onerror = function() {
+                        this.parentNode.innerHTML = '<div class="loading">Sarjakuvaa ei saatavilla</div>';
+                    };
+                    
+                    comicDiv.appendChild(img);
+                    comicsContent.appendChild(comicDiv);
+                    continue;
+                }
             }
+            
+            // Fallback: show link
+            throw new Error('Image not found');
         } catch (error) {
             console.error('Error loading comic:', comicId, error);
             // Show fallback link
@@ -666,7 +664,7 @@ async function loadComics() {
             link.href = `https://www.hs.fi/sarjakuvat/${comicId}/`;
             link.className = 'comic-link';
             link.target = '_blank';
-            link.textContent = 'Avaa sarjakuva →';
+            link.textContent = 'Avaa sarjakuva';
             comicDiv.appendChild(link);
             
             comicsContent.appendChild(comicDiv);
