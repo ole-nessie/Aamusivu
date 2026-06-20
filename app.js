@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadNameday();
     loadComics();
     loadNews();
+    loadHSNews();
 });
 
 // Weather
@@ -759,5 +760,72 @@ async function loadNews() {
     } catch (error) {
         console.error('News error:', error);
         document.getElementById('newsContent').innerHTML = '<div class="error">Virhe uutisissa</div>';
+    }
+}
+
+// HS.fi Most Read News
+async function loadHSNews() {
+    const hsNewsContent = document.getElementById('hsNewsContent');
+    hsNewsContent.innerHTML = '<div class="loading">Ladataan...</div>';
+    
+    try {
+        // Use r.jina.ai CORS proxy to fetch HS most read page
+        const proxyUrl = 'https://r.jina.ai/https://www.hs.fi/luetuimmat/';
+        const response = await fetch(proxyUrl);
+        const text = await response.text();
+        
+        // Extract article links from the page
+        const articleLinks = [];
+        const linkRegex = /https:\/\/www\.hs\.fi\/[^"\s]*/g;
+        let match;
+        
+        while ((match = linkRegex.exec(text)) !== null) {
+            const url = match[0];
+            // Filter out non-article links (images, etc.)
+            if (url.includes('/art-') && !url.includes('.svg') && !url.includes('.jpg') && !url.includes('.png')) {
+                articleLinks.push(url);
+            }
+        }
+        
+        // Remove duplicates
+        const uniqueLinks = [...new Set(articleLinks)];
+        
+        hsNewsContent.innerHTML = '';
+        
+        if (uniqueLinks.length > 0) {
+            // Take first 10 items
+            const itemsToShow = Math.min(uniqueLinks.length, 10);
+            
+            for (let i = 0; i < itemsToShow; i++) {
+                const url = uniqueLinks[i];
+                
+                // Try to extract article ID and create a clean title from URL
+                const urlParts = url.split('/');
+                const articlePart = urlParts.find(p => p.includes('art-'));
+                const articleId = articlePart ? articlePart.replace('.html', '') : 'article';
+                
+                const newsItem = document.createElement('div');
+                newsItem.className = 'news-item';
+                
+                const titleEl = document.createElement('div');
+                titleEl.className = 'news-title';
+                titleEl.textContent = articleId || 'Ei otsikkoa';
+                newsItem.appendChild(titleEl);
+                
+                const linkEl = document.createElement('a');
+                linkEl.href = url;
+                linkEl.className = 'news-link';
+                linkEl.target = '_blank';
+                linkEl.textContent = 'Lue lisää →';
+                newsItem.appendChild(linkEl);
+                
+                hsNewsContent.appendChild(newsItem);
+            }
+        } else {
+            hsNewsContent.innerHTML = '<div class="error">Luetuimpia uutisia ei saatavilla</div>';
+        }
+    } catch (error) {
+        console.error('HS News error:', error);
+        document.getElementById('hsNewsContent').innerHTML = '<div class="error">Virhe luetuimpien uutisten latauksessa</div>';
     }
 }
