@@ -586,52 +586,92 @@ function getFinnishNamedays() {
 }
 
 // Comics section - display actual comic images
-function loadComics() {
+async function loadComics() {
     const today = new Date();
     const dayOfWeek = today.getDay();
     const comicsForDay = COMICS[dayOfWeek] || [];
 
     const comicsContent = document.getElementById('comicsContent');
-    comicsContent.innerHTML = '';
+    comicsContent.innerHTML = '<div class="loading">Ladataan sarjakuvia...</div>';
 
     if (comicsForDay.length === 0) {
         comicsContent.innerHTML = '<div class="loading">Ei sarjakuvia tänään</div>';
         return;
     }
 
-    comicsForDay.forEach(comicId => {
-        const comicDiv = document.createElement('div');
-        comicDiv.className = 'comic';
-        
-        const title = document.createElement('div');
-        title.className = 'comic-title';
-        title.textContent = COMIC_DISPLAY_NAMES[comicId];
-        comicDiv.appendChild(title);
-
-        // Create image element with the comic strip
-        const img = document.createElement('img');
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const dateStr = `${year}${month}${day}`;
-        
-        // HS.fi comic image URL pattern
-        img.src = `https://sarjakuvat.hs.fi/strips/${comicId}/${comicId}_${dateStr}.gif`;
-        img.alt = COMIC_DISPLAY_NAMES[comicId] || comicId;
-        img.className = 'comic-image';
-        img.onerror = function() {
-            // Fallback: try without date in URL
-            this.src = `https://sarjakuvat.hs.fi/strips/${comicId}/${comicId}.gif`;
-            this.onerror = function() {
-                // If fallback also fails, show a placeholder
-                this.parentNode.innerHTML = '<div class="loading">Sarjakuvaa ei saatavilla</div>';
-            };
-        };
-        
-        comicDiv.appendChild(img);
-
-        comicsContent.appendChild(comicDiv);
-    });
+    for (const comicId of comicsForDay) {
+        try {
+            // Fetch the comic page via CORS proxy
+            const proxyUrl = `https://r.jina.ai/https://www.hs.fi/sarjakuvat/${comicId}/`;
+            const response = await fetch(proxyUrl);
+            const text = await response.text();
+            
+            // Extract image hash from the page
+            const hashMatch = text.match(/https:\/\/images\.sanoma-sndp\.fi\/([a-f0-9]+)\/some\/hs-cartoons\.jpg/);
+            
+            if (hashMatch) {
+                const hash = hashMatch[1];
+                const imgUrl = `https://images.sanoma-sndp.fi/${hash}/normal/978.jpg`;
+                
+                // Create comic container
+                const comicDiv = document.createElement('div');
+                comicDiv.className = 'comic';
+                
+                const title = document.createElement('div');
+                title.className = 'comic-title';
+                title.textContent = COMIC_DISPLAY_NAMES[comicId];
+                comicDiv.appendChild(title);
+                
+                const img = document.createElement('img');
+                img.src = imgUrl;
+                img.alt = COMIC_DISPLAY_NAMES[comicId] || comicId;
+                img.className = 'comic-image';
+                img.onerror = function() {
+                    this.parentNode.innerHTML = '<div class="loading">Sarjakuvaa ei saatavilla</div>';
+                };
+                
+                comicDiv.appendChild(img);
+                comicsContent.appendChild(comicDiv);
+            } else {
+                // Fallback: just show the link
+                const comicDiv = document.createElement('div');
+                comicDiv.className = 'comic';
+                
+                const title = document.createElement('div');
+                title.className = 'comic-title';
+                title.textContent = COMIC_DISPLAY_NAMES[comicId];
+                comicDiv.appendChild(title);
+                
+                const link = document.createElement('a');
+                link.href = `https://www.hs.fi/sarjakuvat/${comicId}/`;
+                link.className = 'comic-link';
+                link.target = '_blank';
+                link.textContent = 'Avaa sarjakuva →';
+                comicDiv.appendChild(link);
+                
+                comicsContent.appendChild(comicDiv);
+            }
+        } catch (error) {
+            console.error('Error loading comic:', comicId, error);
+            // Show fallback link
+            const comicDiv = document.createElement('div');
+            comicDiv.className = 'comic';
+            
+            const title = document.createElement('div');
+            title.className = 'comic-title';
+            title.textContent = COMIC_DISPLAY_NAMES[comicId];
+            comicDiv.appendChild(title);
+            
+            const link = document.createElement('a');
+            link.href = `https://www.hs.fi/sarjakuvat/${comicId}/`;
+            link.className = 'comic-link';
+            link.target = '_blank';
+            link.textContent = 'Avaa sarjakuva →';
+            comicDiv.appendChild(link);
+            
+            comicsContent.appendChild(comicDiv);
+        }
+    }
 }
 
 // News - Use Yle's public RSS feed via CORS proxy
