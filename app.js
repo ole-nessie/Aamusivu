@@ -774,46 +774,43 @@ async function loadHSNews() {
         const response = await fetch(proxyUrl);
         const text = await response.text();
         
-        // Extract article links from the page
-        const articleLinks = [];
-        const linkRegex = /https:\/\/www\.hs\.fi\/[^"\s]*/g;
+        // Parse markdown to extract article titles and URLs
+        // Format: "## [Title](url)" or "## Title](url)"
+        const items = [];
+        const titleRegex = /^\d+\.\s*##\s*\[?([^\]\n]+)\]?\((https:\/\/www\.hs\.fi\/[^)]+)\)/gm;
         let match;
         
-        while ((match = linkRegex.exec(text)) !== null) {
-            const url = match[0];
-            // Filter out non-article links (images, etc.)
-            if (url.includes('/art-') && !url.includes('.svg') && !url.includes('.jpg') && !url.includes('.png')) {
-                articleLinks.push(url);
+        while ((match = titleRegex.exec(text)) !== null) {
+            const title = match[1].trim();
+            let url = match[2];
+            
+            // Clean up URL - remove trailing characters if any
+            url = url.replace(/[)\]\s]*$/, '');
+            
+            if (title && url) {
+                items.push({ title, url });
             }
         }
         
-        // Remove duplicates
-        const uniqueLinks = [...new Set(articleLinks)];
-        
         hsNewsContent.innerHTML = '';
         
-        if (uniqueLinks.length > 0) {
+        if (items.length > 0) {
             // Take first 10 items
-            const itemsToShow = Math.min(uniqueLinks.length, 10);
+            const itemsToShow = Math.min(items.length, 10);
             
             for (let i = 0; i < itemsToShow; i++) {
-                const url = uniqueLinks[i];
-                
-                // Try to extract article ID and create a clean title from URL
-                const urlParts = url.split('/');
-                const articlePart = urlParts.find(p => p.includes('art-'));
-                const articleId = articlePart ? articlePart.replace('.html', '') : 'article';
+                const item = items[i];
                 
                 const newsItem = document.createElement('div');
                 newsItem.className = 'news-item';
                 
                 const titleEl = document.createElement('div');
                 titleEl.className = 'news-title';
-                titleEl.textContent = articleId || 'Ei otsikkoa';
+                titleEl.textContent = item.title;
                 newsItem.appendChild(titleEl);
                 
                 const linkEl = document.createElement('a');
-                linkEl.href = url;
+                linkEl.href = item.url;
                 linkEl.className = 'news-link';
                 linkEl.target = '_blank';
                 linkEl.textContent = 'Lue lisää →';
