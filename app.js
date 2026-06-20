@@ -585,7 +585,7 @@ function getFinnishNamedays() {
     };
 }
 
-// Comics section - simple links (works on mobile with HS login)
+// Comics section - display actual comic images
 function loadComics() {
     const today = new Date();
     const dayOfWeek = today.getDay();
@@ -608,12 +608,27 @@ function loadComics() {
         title.textContent = COMIC_DISPLAY_NAMES[comicId];
         comicDiv.appendChild(title);
 
-        const link = document.createElement('a');
-        link.href = `https://www.hs.fi/sarjakuvat/${comicId}`;
-        link.className = 'comic-link';
-        link.target = '_blank';
-        link.textContent = 'Avaa sarjakuva →';
-        comicDiv.appendChild(link);
+        // Create image element with the comic strip
+        const img = document.createElement('img');
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const dateStr = `${year}${month}${day}`;
+        
+        // HS.fi comic image URL pattern
+        img.src = `https://sarjakuvat.hs.fi/strips/${comicId}/${comicId}_${dateStr}.gif`;
+        img.alt = COMIC_DISPLAY_NAMES[comicId] || comicId;
+        img.className = 'comic-image';
+        img.onerror = function() {
+            // Fallback: try without date in URL
+            this.src = `https://sarjakuvat.hs.fi/strips/${comicId}/${comicId}.gif`;
+            this.onerror = function() {
+                // If fallback also fails, show a placeholder
+                this.parentNode.innerHTML = '<div class="loading">Sarjakuvaa ei saatavilla</div>';
+            };
+        };
+        
+        comicDiv.appendChild(img);
 
         comicsContent.appendChild(comicDiv);
     });
