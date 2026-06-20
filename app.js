@@ -6,13 +6,13 @@ const LOCATIONS = [
 ];
 
 const COMICS = {
-    0: ['lassi-ja-leevi', 'keskenkasvuisia'], // Sunday
-    1: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    2: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    3: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    4: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    5: ['fingerpori', 'fok_it', 'harald-hirmuinen'],
-    6: ['fingerpori', 'fok_it', 'harald-hirmuinen']
+    0: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia'],
+    1: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia'],
+    2: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia'],
+    3: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia'],
+    4: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia'],
+    5: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia'],
+    6: ['fingerpori', 'fok_it', 'harald-hirmuinen', 'lassi-ja-leevi', 'keskenkasvuisia']
 };
 
 const COMIC_DISPLAY_NAMES = {
