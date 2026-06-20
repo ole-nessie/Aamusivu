@@ -727,8 +727,8 @@ async function loadNews() {
         newsContent.innerHTML = '';
 
         if (items.length > 0) {
-            // Take first 5 items
-            const itemsToShow = Math.min(items.length, 5);
+            // Take first 10 items
+            const itemsToShow = Math.min(items.length, 10);
             for (let i = 0; i < itemsToShow; i++) {
                 const item = items[i];
                 const newsItem = document.createElement('div');
