@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadComics();
     loadNews();
     loadHSNews();
+    loadKulttuuriNews();
+    loadHSVisioNews();
+    loadHelsinkiNews();
 });
 
 // Weather
@@ -824,5 +827,179 @@ async function loadHSNews() {
     } catch (error) {
         console.error('HS News error:', error);
         document.getElementById('hsNewsContent').innerHTML = '<div class="error">Virhe luetuimpien uutisten latauksessa</div>';
+    }
+}
+
+// Kulttuuri News
+async function loadKulttuuriNews() {
+    const newsContent = document.getElementById('kulttuuriNewsContent');
+    newsContent.innerHTML = '<div class="loading">Ladataan...</div>';
+    
+    try {
+        const proxyUrl = 'https://r.jina.ai/https://www.hs.fi/kulttuuri/';
+        const response = await fetch(proxyUrl);
+        const text = await response.text();
+        
+        // Parse markdown to extract article titles and URLs
+        const items = [];
+        const titleRegex = /##\s*\[?([^\]\n\)]+)\]?\((https:\/\/www\.hs\.fi\/kulttuuri\/art-[0-9]+\.html)\)/g;
+        let match;
+        
+        while ((match = titleRegex.exec(text)) !== null) {
+            const title = match[1].trim();
+            let url = match[2].replace(/[)\]\s]*$/, '');
+            
+            if (title && url) {
+                items.push({ title, url });
+            }
+        }
+        
+        newsContent.innerHTML = '';
+        
+        if (items.length > 0) {
+            const itemsToShow = Math.min(items.length, 5);
+            
+            for (let i = 0; i < itemsToShow; i++) {
+                const item = items[i];
+                
+                const newsItem = document.createElement('div');
+                newsItem.className = 'news-item';
+                
+                const titleEl = document.createElement('div');
+                titleEl.className = 'news-title';
+                titleEl.textContent = item.title;
+                newsItem.appendChild(titleEl);
+                
+                const linkEl = document.createElement('a');
+                linkEl.href = item.url;
+                linkEl.className = 'news-link';
+                linkEl.target = '_blank';
+                linkEl.textContent = 'Lue lisää →';
+                newsItem.appendChild(linkEl);
+                
+                newsContent.appendChild(newsItem);
+            }
+        } else {
+            newsContent.innerHTML = '<div class="error">Kulttuuri-uutisia ei saatavilla</div>';
+        }
+    } catch (error) {
+        console.error('Kulttuuri News error:', error);
+        document.getElementById('kulttuuriNewsContent').innerHTML = '<div class="error">Virhe kulttuiruutisten latauksessa</div>';
+    }
+}
+
+// HS Visio News
+async function loadHSVisioNews() {
+    const newsContent = document.getElementById('visioNewsContent');
+    newsContent.innerHTML = '<div class="loading">Ladataan...</div>';
+    
+    try {
+        const proxyUrl = 'https://r.jina.ai/https://www.hs.fi/visio/';
+        const response = await fetch(proxyUrl);
+        const text = await response.text();
+        
+        // Parse markdown to extract article titles and URLs
+        const items = [];
+        const titleRegex = /##\s*\[?([^\]\n\)]+)\]?\((https:\/\/www\.hs\.fi\/visio\/art-[0-9]+\.html)\)/g;
+        let match;
+        
+        while ((match = titleRegex.exec(text)) !== null) {
+            const title = match[1].trim();
+            let url = match[2].replace(/[)\]\s]*$/, '');
+            
+            if (title && url) {
+                items.push({ title, url });
+            }
+        }
+        
+        newsContent.innerHTML = '';
+        
+        if (items.length > 0) {
+            const itemsToShow = Math.min(items.length, 5);
+            
+            for (let i = 0; i < itemsToShow; i++) {
+                const item = items[i];
+                
+                const newsItem = document.createElement('div');
+                newsItem.className = 'news-item';
+                
+                const titleEl = document.createElement('div');
+                titleEl.className = 'news-title';
+                titleEl.textContent = item.title;
+                newsItem.appendChild(titleEl);
+                
+                const linkEl = document.createElement('a');
+                linkEl.href = item.url;
+                linkEl.className = 'news-link';
+                linkEl.target = '_blank';
+                linkEl.textContent = 'Lue lisää →';
+                newsItem.appendChild(linkEl);
+                
+                newsContent.appendChild(newsItem);
+            }
+        } else {
+            newsContent.innerHTML = '<div class="error">Visio-uutisia ei saatavilla</div>';
+        }
+    } catch (error) {
+        console.error('Visio News error:', error);
+        document.getElementById('visioNewsContent').innerHTML = '<div class="error">Virhe Visio-uutisten latauksessa</div>';
+    }
+}
+
+// Helsinki News
+async function loadHelsinkiNews() {
+    const newsContent = document.getElementById('helsinkiNewsContent');
+    newsContent.innerHTML = '<div class="loading">Ladataan...</div>';
+    
+    try {
+        const proxyUrl = 'https://r.jina.ai/https://www.hs.fi/helsinki/';
+        const response = await fetch(proxyUrl);
+        const text = await response.text();
+        
+        // Parse markdown to extract article titles and URLs
+        const items = [];
+        const titleRegex = /##\s*\[?([^\]\n\)]+)\]?\((https:\/\/www\.hs\.fi\/helsinki\/art-[0-9]+\.html)\)/g;
+        let match;
+        
+        while ((match = titleRegex.exec(text)) !== null) {
+            const title = match[1].trim();
+            let url = match[2].replace(/[)\]\s]*$/, '');
+            
+            if (title && url) {
+                items.push({ title, url });
+            }
+        }
+        
+        newsContent.innerHTML = '';
+        
+        if (items.length > 0) {
+            const itemsToShow = Math.min(items.length, 5);
+            
+            for (let i = 0; i < itemsToShow; i++) {
+                const item = items[i];
+                
+                const newsItem = document.createElement('div');
+                newsItem.className = 'news-item';
+                
+                const titleEl = document.createElement('div');
+                titleEl.className = 'news-title';
+                titleEl.textContent = item.title;
+                newsItem.appendChild(titleEl);
+                
+                const linkEl = document.createElement('a');
+                linkEl.href = item.url;
+                linkEl.className = 'news-link';
+                linkEl.target = '_blank';
+                linkEl.textContent = 'Lue lisää →';
+                newsItem.appendChild(linkEl);
+                
+                newsContent.appendChild(newsItem);
+            }
+        } else {
+            newsContent.innerHTML = '<div class="error">Helsinki-uutisia ei saatavilla</div>';
+        }
+    } catch (error) {
+        console.error('Helsinki News error:', error);
+        document.getElementById('helsinkiNewsContent').innerHTML = '<div class="error">Virhe Helsinki-uutisten latauksessa</div>';
     }
 }
