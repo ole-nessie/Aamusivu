@@ -224,7 +224,7 @@ async function loadNameday() {
 
         const namedays = await response.json();
         // The JSON has keys like "2013-01-01", find matching date
-        const fullDateKey = Object.keys(namedays).find(key => key.endsWith(`-${dateKey}`));
+        const fullDateKey = Object.keys(namedays).find(key => key.endsWith(dateKey));
         
         let names = 'Ei nimipäivää';
         if (fullDateKey) {
