@@ -207,29 +207,26 @@ function createWeatherLocation(name, data) {
     return container;
 }
 
-// Nameday - fetch from external JSON source (GitHub Gist)
-const NAMEDAY_API_URL = 'https://gist.githubusercontent.com/zokier/1951412/raw/gistfile1.json';
-
+// Nameday - fetch from nimipaivat.fi (up-to-date Finnish namedays)
 async function loadNameday() {
     try {
         const today = new Date();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const dateKey = `${month}-${day}`;
-
-        const response = await fetch(NAMEDAY_API_URL);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const namedays = await response.json();
-        // The JSON has keys like "2013-01-01", find matching date
-        const fullDateKey = Object.keys(namedays).find(key => key.endsWith(dateKey));
         
+        // Use r.jina.ai CORS proxy to fetch nimipaivat.fi
+        const proxyUrl = 'https://r.jina.ai/https://www.nimipaivat.fi/';
+        const response = await fetch(proxyUrl);
+        const text = await response.text();
+
+        // Extract nameday information from the page
+        // Format: "Tänään [date] nimipäivää viettävät [names]."
         let names = 'Ei nimipäivää';
-        if (fullDateKey) {
-            const dayNames = namedays[fullDateKey];
-            names = dayNames.length > 0 ? dayNames.join(', ') : 'Ei nimipäivää';
+        const match = text.match(/nimipäivää viettävät (.*)\./);
+        if (match) {
+            // Clean up the names - remove markdown links like [Name](url)
+            names = match[1]
+                .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // Remove [Name](url) -> Name
+                .replace(/ ja /g, ', ')  // Replace "ja" with comma for consistency
+                .trim();
         }
 
         document.getElementById('namedayContent').innerHTML = `<strong>${today.toLocaleDateString('fi-FI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong><br>${names}`;
