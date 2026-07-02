@@ -1,8 +1,8 @@
 // Configuration
 const LOCATIONS = [
-    { name: 'Itä-Pasila', lat: 60.2055, lon: 25.0823 },
-    { name: 'Hyvinkää', lat: 60.6295, lon: 25.1088 },
-    { name: 'Lammi', lat: 61.0347, lon: 25.0422 }
+    { name: 'Itä-Pasila', lat: 60.2055, lon: 25.0823, fmiUrl: 'https://www.ilmatieteenlaitos.fi/saa/helsinki/it%C3%A4-pasila?forecast=daily' },
+    { name: 'Hyvinkää', lat: 60.6295, lon: 25.1088, fmiUrl: 'https://www.ilmatieteenlaitos.fi/saa/hyvink%C3%A4%C3%A4?forecast=daily' },
+    { name: 'Lammi', lat: 61.0347, lon: 25.0422, fmiUrl: 'https://www.ilmatieteenlaitos.fi/saa/h%C3%A4meenlinna/lammi?forecast=daily' }
 ];
 
 const COMICS = {
@@ -85,7 +85,7 @@ async function loadWeather() {
         for (const location of LOCATIONS) {
             const data = await fetchWeatherForecast(location);
             if (data) {
-                const card = createWeatherLocation(location.name, data);
+                const card = createWeatherLocation(location, data);
                 weatherContent.appendChild(card);
             }
         }
@@ -183,13 +183,16 @@ function getWeatherIcon(code) {
     return '🌤️';
 }
 
-function createWeatherLocation(name, data) {
+function createWeatherLocation(location, data) {
     const container = document.createElement('div');
     container.className = 'weather-location';
     
-    const title = document.createElement('div');
+    const title = document.createElement('a');
     title.className = 'location-name';
-    title.textContent = name;
+    title.textContent = location.name;
+    title.href = location.fmiUrl;
+    title.target = '_blank';
+    title.rel = 'noopener noreferrer';
     container.appendChild(title);
 
     const grid = document.createElement('div');
