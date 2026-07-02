@@ -42,7 +42,39 @@ document.addEventListener('DOMContentLoaded', () => {
     loadKulttuuriNews();
     loadHSVisioNews();
     loadHelsinkiNews();
+    
+    // Setup refresh button
+    setupRefreshButton();
 });
+
+// Refresh functionality
+function refreshAll() {
+    return Promise.all([
+        loadWeather(),
+        loadNameday(),
+        loadComics(),
+        loadNews(),
+        loadHSNews(),
+        loadKulttuuriNews(),
+        loadHSVisioNews(),
+        loadHelsinkiNews()
+    ]);
+}
+
+function setupRefreshButton() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '🔄 Päivitetään...';
+            
+            refreshAll().finally(() => {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Päivitä';
+            });
+        });
+    }
+}
 
 // Weather
 async function loadWeather() {

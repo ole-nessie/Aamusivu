@@ -174,9 +174,33 @@
             font-size: 13px;
             padding: 8px 0;
         }
+        
+        .refresh-btn {
+            background-color: #fafafa;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-bottom: 16px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .refresh-btn:hover {
+            background-color: #eee;
+        }
+        
+        .refresh-btn:active {
+            background-color: #ddd;
+        }
     </style>
 </head>
 <body>
+    <button id="refreshBtn" class="refresh-btn">🔄 Päivitä</button>
     <section id="weather">
         <h2>Sää</h2>
         <div id="weatherContent"></div>
