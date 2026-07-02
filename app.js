@@ -252,12 +252,13 @@ async function loadNameday() {
         // Extract nameday information from the page
         // Format: "Tänään [date] nimipäivää viettävät [names]."
         let names = 'Ei nimipäivää';
-        const match = text.match(/nimipäivää viettävät (.*)\./);
+        const match = text.match(/nimipäivää viettävät (.+?)\.\s*$/m);
         if (match) {
             // Clean up the names - remove markdown links like [Name](url)
             names = match[1]
                 .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // Remove [Name](url) -> Name
                 .replace(/ ja /g, ', ')  // Replace "ja" with comma for consistency
+                .replace(/,\s*,/g, ', ')  // Clean up extra commas
                 .trim();
         }
 
